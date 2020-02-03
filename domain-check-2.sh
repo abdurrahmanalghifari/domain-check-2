@@ -10,6 +10,9 @@
 #
 # Revision History:
 #
+#  Version 2.19
+#   Added support for .id // https://github.com/abdurrahmanalghifari/
+#   Added support fot .io/.travel 
 #  Version 2.18
 #   Added support for .pro/.mx/.ro/.aero/.asia/.cc/.college domain -- Vivek Gite <github.com/nixcraft>
 #   Added suport for .it domain -- https://github.com/pelligrag
@@ -185,6 +188,7 @@ WHOIS_SERVER="whois.internic.org"
 
 # Location of system binaries
 AWK=`which awk`
+#WHOIS="timeout 5 /usr/bin/whois"
 WHOIS=`which whois`
 DATE=`which date`
 CUT=`which cut`
@@ -291,6 +295,7 @@ check_domain_status()
     # Save the domain since set will trip up the ordering
     DOMAIN=${1}
     TLDTYPE="`echo ${DOMAIN} | ${CUT} -d '.' -f3 | tr '[A-Z]' '[a-z]'`"
+    #echo $TLDTYPE
     if [ "${TLDTYPE}"  == "" ];
     then
 	    TLDTYPE="`echo ${DOMAIN} | ${CUT} -d '.' -f2 | tr '[A-Z]' '[a-z]'`"
@@ -300,19 +305,28 @@ check_domain_status()
     #${WHOIS} -h ${WHOIS_SERVER} "=${1}" > ${WHOIS_TMP}
     # Let whois select server
     
-    WHS="$(${WHOIS} -h "whois.iana.org" "${TLDTYPE}" | ${GREP} 'whois:' | ${AWK} '{print $2}')"
-    
+    WHS="$(timeout 5 ${WHOIS} -h "whois.iana.org" "${TLDTYPE}" | ${GREP} 'whois:' | ${AWK} '{print $2}')"
+    #printf $DOMAIN
+    #WHS="whois.verisign-grs.com"
+    #echo $WHS $TLDTYPE
+
     if [ "${TLDTYPE}" == "jp" ];
     then
-	${WHOIS} -h ${WHS} "${1}" > ${WHOIS_TMP}
+	timeout 5 ${WHOIS} -h ${WHS} "${1}" > ${WHOIS_TMP}
     else   
-	${WHOIS} -h ${WHS} "${1}" > ${WHOIS_TMP}
+	timeout 5 ${WHOIS} -h ${WHS} "${1}" > ${WHOIS_TMP}
     fi
 
     if [ "${TLDTYPE}" == "aero" ];
     then
-	    ${WHOIS} -h whois.aero "${1}" > ${WHOIS_TMP}
+	    timeout 5 ${WHOIS} -h whois.aero "${1}" > ${WHOIS_TMP}
     fi
+#####START DOT ID 
+    if [ "${TLDTYPE}" == "id" ];
+    then
+    	    timeout 5 ${WHOIS} -h whois.id "${1}" > ${WHOIS_TMP}
+    fi
+#####END
     # Parse out the expiration date and registrar -- uses the last registrar it finds
     REGISTRAR=`cat ${WHOIS_TMP} | ${AWK} -F: '/Registrar:/ && $2 != ""  { REGISTRAR=substr($2,2,17) } END { print REGISTRAR }'`
 
@@ -326,6 +340,11 @@ check_domain_status()
     then
         REGISTRAR=`cat ${WHOIS_TMP} | ${AWK} '/Registrant/ && $2 != ""  { REGISTRAR=substr($2,1,17) } END { print REGISTRAR }'`
     # no longer shows Registrar name, so will use Status #	
+#####Start DOT ID
+    elif [ "${TLDTYPE}" == "id" ];
+    then
+    REGISTRAR=`cat ${WHOIS_TMP} | ${AWK} -F: '/Registrar Organization:/ && $2 != ""  { REGISTRAR=substr($2,1,17) } END { print REGISTRAR }'`
+#####END
     elif [ "${TLDTYPE}" == "md" ];
     then
         REGISTRAR=`cat ${WHOIS_TMP} | ${AWK} -F: '/Status:/ && $2 != ""  { REGISTRAR=substr($2,2,27) } END { print REGISTRAR }'`
@@ -392,7 +411,6 @@ check_domain_status()
     fi
 
     # The whois Expiration data should resemble the following: "Expiration Date: 09-may-2008"
-
     if [ "${TLDTYPE}" == "info" -o "${TLDTYPE}" == "org" ];
     then
 	    tdomdate=`cat ${WHOIS_TMP} | ${AWK} '/Expiry Date:/ { print $4 }'`
@@ -528,7 +546,7 @@ check_domain_status()
 	       esac
 	   tday=`echo ${tdomdate} | ${CUT} -d "-" -f 3 | ${CUT} -d "T" -f 1`
            DOMAINDATE=`echo "${tday}-${tmonth}-${tyear}"`
-    elif [ "${TLDTYPE}" == "com" -o "${TLDTYPE}" == "net" -o "${TLDTYPE}" == "org"  -o "${TLDTYPE}" == "link" -o "${TLDTYPE}" == "blog" -o "${TLDTYPE}" == "cafe" -o "${TLDTYPE}" == "biz" -o "${TLDTYPE}" == "us" -o "${TLDTYPE}" == "mobi" -o "${TLDTYPE}" == "tv" -o "${TLDTYPE}" == "co" -o "${TLDTYPE}" == "pro" -o "${TLDTYPE}" == "cafe" -o "${TLDTYPE}" == "in" -o "${TLDTYPE}" == "cat" -o "${TLDTYPE}" == "asia" -o "${TLDTYPE}" == "cc" -o "${TLDTYPE}" == "college" -o "${TLDTYPE}" == "aero"  ]; # added on 26-aug-2017 by nixCraft
+    elif [ "${TLDTYPE}" == "com" -o "${TLDTYPE}" == "net" -o "${TLDTYPE}" == "org"  -o "${TLDTYPE}" == "link" -o "${TLDTYPE}" == "blog" -o "${TLDTYPE}" == "cafe" -o "${TLDTYPE}" == "biz" -o "${TLDTYPE}" == "us" -o "${TLDTYPE}" == "mobi" -o "${TLDTYPE}" == "tv" -o "${TLDTYPE}" == "co" -o "${TLDTYPE}" == "pro" -o "${TLDTYPE}" == "cafe" -o "${TLDTYPE}" == "in" -o "${TLDTYPE}" == "cat" -o "${TLDTYPE}" == "asia" -o "${TLDTYPE}" == "travel" -o "${TLDTYPE}" == "io" -o "${TLDTYPE}" == "cc" -o "${TLDTYPE}" == "college" -o "${TLDTYPE}" == "aero"  ]; # added on 26-aug-2017 by nixCraft (add io, travel )
     then
            tdomdate=`cat ${WHOIS_TMP} | ${AWK} '/Registry Expiry Date:/ { print $NF }'`
            tyear=`echo ${tdomdate} | ${CUT} -d'-' -f1`
@@ -780,8 +798,32 @@ check_domain_status()
                      *) tmonth=0 ;;
                esac
         tday=`echo ${tdomdate} | ${CUT} -d "-" -f 3`
+########START DOT ID
         DOMAINDATE=`echo "${tday}-${tmonth}-${tyear}"`
 
+    elif [ "${TLDTYPE}" == "id" ];     
+    then
+        tdomdate=`cat ${WHOIS_TMP} | ${AWK} '/Expiration Date:/ { print $2 }' | sed -e 's/Date\:\(.*\)/\1/'`
+        tyear=`echo ${tdomdate} | ${CUT} -d "-" -f 1`
+        tmon=`echo ${tdomdate} | ${CUT} -d "-" -f 2`
+           case ${tmon} in
+                 1|01) tmonth=jan ;;
+                 2|02) tmonth=feb ;;
+                 3|03) tmonth=mar ;;
+                 4|04) tmonth=apr ;;
+                 5|05) tmonth=may ;;
+                 6|06) tmonth=jun ;;
+                 7|07) tmonth=jul ;;
+                 8|08) tmonth=aug ;;
+                 9|09) tmonth=sep ;;
+                 10) tmonth=oct ;;
+                 11) tmonth=nov ;;
+                 12) tmonth=dec ;;
+                      *) tmonth=0 ;;
+               esac
+        tday=`echo ${tdomdate} | ${CUT} -d "-" -f 3`
+        DOMAINDATE=`echo "${tday}-${tmonth}-${tyear}"`
+########END
     elif [ "${TLDTYPE}" == "ro" ];	# added by nixCraft 07/jan/2019 
     then
         tdomdate=`cat ${WHOIS_TMP} | ${AWK} -F':' '/Expires On:/ { print $2 }'`
@@ -834,7 +876,7 @@ check_domain_status()
           if [ "${ALARM}" == "TRUE" ]
           then
                 echo "The domain ${DOMAIN} has expired!" \
-                | ${MAIL} -s "Domain ${DOMAIN} has expired!" ${ADMIN}
+                | ${MAIL} -r info@abdurrahmanalghifari.github.io -s "Domain ${DOMAIN} has expired!" ${ADMIN}
            fi
 
            prints "${DOMAIN}" "Expired" "${DOMAINDATE}" "${DOMAINDIFF}" "${REGISTRAR}"
@@ -844,7 +886,7 @@ check_domain_status()
            if [ "${ALARM}" == "TRUE" ]
            then
                     echo "The domain ${DOMAIN} will expire on ${DOMAINDATE}" \
-                    | ${MAIL} -s "Domain ${DOMAIN} will expire in ${WARNDAYS}-days or less" ${ADMIN}
+                    | ${MAIL} -r info@abdurrahmanalghifari.github.io -s "Domain ${DOMAIN} will expire in ${WARNDAYS}-days or less" ${ADMIN}
             fi
             prints "${DOMAIN}" "Expiring" "${DOMAINDATE}" "${DOMAINDIFF}" "${REGISTRAR}"
      else
@@ -880,7 +922,8 @@ prints()
     if [ "${QUIET}" != "TRUE" ]
     then
             MIN_DATE=$(echo $3 | ${AWK} '{ print $1, $2, $4 }')
-            printf "%-35s %-46s %-8s %-11s %-5s\n" "$1" "$5" "$2" "$MIN_DATE" "$4"
+            printf "%-35s %-46s %-8s %-11s %-5s\n" "${DOMAIN}" "${REGISTRAR}" "$2" "$MIN_DATE" "$4"
+            #printf "%-35s %-46s %-8s %-11s %-5s\n" "$1" "$5" "$2" "$MIN_DATE" "$4"
     fi
 }
 
